@@ -1,0 +1,321 @@
+<div id="json"></div>
+
+<script>
+var screenHeight = 512;
+var screenWidth = 288;
+var centerX = screenWidth/2;
+var centerY = screenHeight/2;
+var config = {
+    type: Phaser.AUTO,
+    width: screenWidth,
+    height: screenHeight,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 800 },
+            debug: false
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+
+
+var atlas;
+var background;
+var bird;
+var land;
+var title;
+var button_play;
+var button_score;
+var pipe_up;
+var pipe_down;
+var playerPoints = 0;
+var highScore = 0;
+var cursor;
+
+var game = new Phaser.Game(config);
+
+function preload ()
+{
+    this.load.atlas('atlas', 'atlas.png', 'atlas.json');
+}
+
+function create ()
+{
+
+  background = this.add.sprite(centerX, centerY, 'atlas', 'bg_day');
+
+  pipes_score = this.physics.add.group({
+    key: 'atlas',
+    frame: 'pipe_down',
+    repeat: 1,
+    setXY: {x: 452, y: centerY, stepX: 150}
+  });
+  makeImmovableAndNoGravity(pipes_score);
+  pipes_score.children.iterate(function(child){
+    child.setAlpha(0);
+  });
+
+  makeLandsAndPipes(this);
+
+  bird = makeBirdAndAnimation('wing', this);
+
+
+  title = this.physics.add.sprite(centerX, -100, 'atlas', 'title');
+  button_play = this.physics.add.sprite(centerX, screenHeight + 36, 'atlas', 'button_play').setInteractive();
+  // button_score = this.physics.add.sprite(centerX + 60, centerY + 80, 'atlas', 'button_score').setInteractive();
+  setupMainMenu(this);
+
+  scoreText = this.add.text(centerX, 50, '0', { fontSize: '32px', fill: '#000' });
+  highScoreText = this.add.text(100, centerY-20, 'High Score: 0', { fontSize: '16px', fill: '#000' });
+  resultText = this.add.text(100, centerY-50, {fontSize: '16px', fill: '#fff'});
+  scoreText.setVisible(false);
+  highScoreText.setVisible(false);
+  resultText.setVisible(false);
+
+
+  game_over_text = this.physics.add.sprite(centerX, -54, 'atlas', 'text_game_over');
+  game_over_text.body.allowGravity = false;
+  game_over_tween = this.tweens.add({
+    targets: game_over_text,
+    y: centerY-140,
+    duration: 400,
+    paused: true,
+    onComplete: function() {this.pause()}
+  });
+
+  this.input.on('pointerdown', wing);
+  // this.input.on('spasedown', wing);
+
+  spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+  this.physics.add.overlap(bird, pipes_score, givePoint, null, this);
+
+  this.physics.add.collider(bird, lands, gameOver);
+  this.physics.add.collider(bird, pipes_up, gameOver);
+  this.physics.add.collider(bird, pipes_down, gameOver);
+}
+
+function update ()
+{
+  if (Phaser.Input.Keyboard.JustDown(spacebar))
+  {
+    wing();
+  }
+  repeatChilds(lands, check=-167, newX=centerX+334, newY=screenHeight-56);
+  new_pipe_position = Phaser.Math.Between(-50, 50);
+  repeatChilds(pipes_down, check=-52, newX=400, newY=new_pipe_position);
+  repeatChilds(pipes_up, check=-52, newX=400, newY=new_pipe_position+420);
+  velocity = bird.body.velocity.y;
+  if (velocity > 20 && bird.rotation < 0.7)
+    bird.rotation += 0.1;
+}
+
+function startGame()
+{
+  placeChilds(pipes_score, 452, centerY, 150);
+  placeChilds(pipes_down, 400, 0, 150);
+  placeChilds(pipes_up, 400, 420, 150);
+  moveChilds(lands);
+  moveChilds(pipes_up);
+  moveChilds(pipes_down);
+  moveChilds(pipes_score);
+  game_over_tween.restart();
+  game_over_tween.pause();
+  bird.setPosition(centerX, centerY - 56);
+  bird.setVelocity(0,0);
+  bird.body.checkCollision = {none: false};
+  bird.body.setAllowGravity(true);
+
+  scoreText.setText('0');
+  highScoreText.setVisible(false);
+  resultText.setVisible(false);
+  scoreText.setVisible(true);
+}
+
+function givePoint(bird, score_pipe)
+{
+  playerPoints++;
+  scoreText.setText(playerPoints);
+  score_pipe.setPosition(487, centerY);
+  moveChilds(lands);
+}
+
+function gameOver()
+{
+  stopChilds(lands);
+  stopChilds(pipes_up);
+  stopChilds(pipes_down);
+  stopChilds(pipes_score);
+
+  play_tween.restart();
+  game_over_tween.restart();
+  bird.body.checkCollision = {none: true};
+  bird.body.setAllowGravity(false);
+
+  if (playerPoints > highScore)
+  {
+    highScoreText.setText('High Score: ' + playerPoints);
+    highScore = playerPoints;
+  }
+  resultText.setText('Your Score: ' + playerPoints);
+  scoreText.setVisible(false);
+  highScoreText.setVisible(true);
+  resultText.setVisible(true);
+  playerPoints = 0;
+}
+
+
+function placeChilds(parent, x, y, step)
+{
+  i=1;
+  parent.children.iterate(function(child){
+    child.setPosition(x+(step*i), y);
+    i++;
+  })
+}
+
+function makeImmovableAndNoGravity(parent)
+{
+  parent.children.iterate(function (child) {
+    child.body.immovable = true;
+    child.body.allowGravity = false;
+  });
+}
+
+function moveChilds(parent)
+{
+  parent.children.iterate(function (child) {
+    child.body.setVelocityX(-100);
+  });
+}
+
+function stopChilds(parent)
+{
+  parent.children.iterate(function (child)
+  {
+    child.body.setVelocityX(0);
+  });
+}
+
+function repeatChilds(parent, check, x, y)
+{
+  parent.children.iterate(function (child) {
+    if (child.x <= check ){
+      child.setPosition(x, y);
+    }
+  });
+}
+
+function randomBird()
+{
+  number = Math.floor(Math.random() * 3);
+  birdname = 'bird' + number;
+  bird = {
+    name: birdname,
+    frames: [{key: 'atlas', frame: birdname+'_0'},
+              {key: 'atlas', frame: birdname+'_1'},
+              {key: 'atlas', frame: birdname+'_2'}]
+  };
+  return bird;
+}
+
+function makeBirdAndAnimation(name, self)
+{
+  birdname = randomBird();
+  birdF = self.physics.add.sprite(centerX, centerY - 56, 'atlas', birdname.name+'_0');
+  self.anims.create({
+    key: name,
+    frames: birdname.frames,
+    frameRate: 8,
+    repeat: -1
+  });
+  birdF.body.setSize(24, 20);
+  birdF.anims.play(name, true);
+  birdF.body.allowGravity = false;
+  return birdF;
+}
+
+function wing()
+{
+  if (bird.body.allowGravity)
+  {
+    bird.setVelocityY(-300);
+    bird.rotation = -0.6;
+  }
+}
+
+function setupMainMenu(self)
+{
+  title.body.allowGravity = false;
+  button_play.body.allowGravity = false;
+  // button_score.body.allowGravity = false;
+
+  title_tween = self.tweens.add({
+    targets: title,
+    y: centerY-140,
+    duration: 400,
+    yoyo: true,
+    onYoyo: function() {this.pause()}
+  });
+
+  play_tween = self.tweens.add({
+    targets: button_play,
+    y: centerY + 80,
+    duration: 400,
+    yoyo: true,
+    onYoyo: function() {this.pause()}
+  });
+
+  // score_tween = self.tweens.add({
+  //   targets: button_score,
+  //   x: centerX+60,
+  //   y: screenHeight + 100,
+  //   duration: 1000,
+  //   ease: 'Power2',
+  //   yoyo: true,
+  //   paused: true,
+  //   onYoyo: function() {this.pause()}
+  // });
+
+  button_play.on('pointerdown', function () {
+    play_tween.resume();
+    // score_tween.resume();
+    title_tween.resume();
+    startGame();
+  });
+}
+
+function makeLandsAndPipes(self)
+{
+  pipes_down = self.physics.add.group({
+    key: 'atlas',
+    frame: 'pipe_down',
+    repeat: 2,
+    setXY: {x: 400, y: 0, stepX: 150}
+  });
+
+  pipes_up = self.physics.add.group({
+    key: 'atlas',
+    frame: 'pipe_up',
+    repeat: 2,
+    setXY: {x: 400, y: 420, stepX: 150}
+  });
+  makeImmovableAndNoGravity(pipes_down);
+  makeImmovableAndNoGravity(pipes_up);
+
+  lands = self.physics.add.group({
+    key: 'atlas',
+    frame: 'land',
+    repeat: 1,
+    setXY: {x: centerX, y: screenHeight - 56, stepX: 335}
+  });
+  makeImmovableAndNoGravity(lands);
+  moveChilds(lands);
+}
+
+</script>
