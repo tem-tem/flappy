@@ -27,7 +27,7 @@ var config = {
 var atlas;
 var background;
 var bird;
-var land;
+var lands;
 var title;
 var button_play;
 var button_score;
@@ -35,7 +35,6 @@ var pipe_up;
 var pipe_down;
 var playerPoints = 0;
 var highScore = 0;
-var cursor;
 
 var game = new Phaser.Game(config);
 
@@ -49,25 +48,21 @@ function create ()
 
   background = this.add.sprite(centerX, centerY, 'atlas', 'bg_day');
 
-  pipes_score = this.physics.add.group({
-    key: 'atlas',
-    frame: 'pipe_down',
-    repeat: 1,
-    setXY: {x: 452, y: centerY, stepX: 150}
-  });
+  pipes_score = makeGroup(frame='pipe_down', repeat=1,x=452, y=centerY, stepX=150, this);
   makeImmovableAndNoGravity(pipes_score);
   pipes_score.children.iterate(function(child){
     child.setAlpha(0);
   });
 
-  makeLandsAndPipes(this);
+  pipes_down = makeGroup(frame='pipe_down', repeat=2, x=400, y=0, stepX=150, this);
+  pipes_up = makeGroup(frame='pipe_up', repeat=2, x=400, y=420, stepX=150, this);
+  lands = makeGroup(frame='land', repeat=1, x=centerX, y=screenHeight-56, stepX=335, this);
+  moveChilds(lands);
 
   bird = makeBirdAndAnimation('wing', this);
 
-
   title = this.physics.add.sprite(centerX, -100, 'atlas', 'title');
   button_play = this.physics.add.sprite(centerX, screenHeight + 36, 'atlas', 'button_play').setInteractive();
-  // button_score = this.physics.add.sprite(centerX + 60, centerY + 80, 'atlas', 'button_score').setInteractive();
   setupMainMenu(this);
 
   scoreText = this.add.text(centerX, 50, '0', { fontSize: '32px', fill: '#000' });
@@ -89,8 +84,6 @@ function create ()
   });
 
   this.input.on('pointerdown', wing);
-  // this.input.on('spasedown', wing);
-
   spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
   this.physics.add.overlap(bird, pipes_score, givePoint, null, this);
@@ -103,16 +96,13 @@ function create ()
 function update ()
 {
   if (Phaser.Input.Keyboard.JustDown(spacebar))
-  {
     wing();
-  }
+  if (bird.body.velocity.y > 20 && bird.rotation < 0.7)
+    bird.rotation += 0.1;
   repeatChilds(lands, check=-167, newX=centerX+334, newY=screenHeight-56);
   new_pipe_position = Phaser.Math.Between(-50, 50);
   repeatChilds(pipes_down, check=-52, newX=400, newY=new_pipe_position);
   repeatChilds(pipes_up, check=-52, newX=400, newY=new_pipe_position+420);
-  velocity = bird.body.velocity.y;
-  if (velocity > 20 && bird.rotation < 0.7)
-    bird.rotation += 0.1;
 }
 
 function startGame()
@@ -130,6 +120,7 @@ function startGame()
   bird.setVelocity(0,0);
   bird.body.checkCollision = {none: false};
   bird.body.setAllowGravity(true);
+  wing();
 
   scoreText.setText('0');
   highScoreText.setVisible(false);
@@ -169,6 +160,17 @@ function gameOver()
   playerPoints = 0;
 }
 
+function makeGroup(frame, repeat, x, y, stepX, self)
+{
+  group = self.physics.add.group({
+    key: 'atlas',
+    frame: frame,
+    repeat: repeat,
+    setXY: {x: x, y: y, stepX: stepX}
+  });
+  makeImmovableAndNoGravity(group);
+  return group;
+}
 
 function placeChilds(parent, x, y, step)
 {
@@ -253,7 +255,6 @@ function setupMainMenu(self)
 {
   title.body.allowGravity = false;
   button_play.body.allowGravity = false;
-  // button_score.body.allowGravity = false;
 
   title_tween = self.tweens.add({
     targets: title,
@@ -271,51 +272,12 @@ function setupMainMenu(self)
     onYoyo: function() {this.pause()}
   });
 
-  // score_tween = self.tweens.add({
-  //   targets: button_score,
-  //   x: centerX+60,
-  //   y: screenHeight + 100,
-  //   duration: 1000,
-  //   ease: 'Power2',
-  //   yoyo: true,
-  //   paused: true,
-  //   onYoyo: function() {this.pause()}
-  // });
 
   button_play.on('pointerdown', function () {
     play_tween.resume();
-    // score_tween.resume();
     title_tween.resume();
     startGame();
   });
-}
-
-function makeLandsAndPipes(self)
-{
-  pipes_down = self.physics.add.group({
-    key: 'atlas',
-    frame: 'pipe_down',
-    repeat: 2,
-    setXY: {x: 400, y: 0, stepX: 150}
-  });
-
-  pipes_up = self.physics.add.group({
-    key: 'atlas',
-    frame: 'pipe_up',
-    repeat: 2,
-    setXY: {x: 400, y: 420, stepX: 150}
-  });
-  makeImmovableAndNoGravity(pipes_down);
-  makeImmovableAndNoGravity(pipes_up);
-
-  lands = self.physics.add.group({
-    key: 'atlas',
-    frame: 'land',
-    repeat: 1,
-    setXY: {x: centerX, y: screenHeight - 56, stepX: 335}
-  });
-  makeImmovableAndNoGravity(lands);
-  moveChilds(lands);
 }
 
 </script>
